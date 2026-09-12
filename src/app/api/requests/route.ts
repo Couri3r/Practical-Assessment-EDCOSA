@@ -6,12 +6,17 @@
 // but this GET exists so a future mobile app can use the same backend.
 
 import { NextResponse } from "next/server";
-import { addRequests, listRequests } from "@/lib/storage";
+import { addRequests, getStore, listRequests } from "@/lib/storage";
 import { isCategory, isPriority } from "@/lib/types";
 
 export async function GET() {
-  const requests = await listRequests();
-  return NextResponse.json({ requests });
+  try {
+    const requests = await listRequests();
+    return NextResponse.json({ requests });
+  } catch (err) {
+    console.error(`[requests] read from ${getStore().name} failed:`, err);
+    return NextResponse.json({ error: "Could not load requests." }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
@@ -37,6 +42,19 @@ export async function POST(request: Request) {
     drafts.push({ text, category: rec.category, priority: rec.priority });
   }
 
-  const saved = await addRequests(drafts);
-  return NextResponse.json({ requests: saved }, { status: 201 });
+  try {
+    const saved = await addRequests(drafts);
+    return NextResponse.json({ requests: saved }, { status: 201 });
+  } catch (err) {
+    const store = getStore();
+    console.error(`[requests] write to ${store.name} failed:`, err);
+
+    // The most likely cause in production: deployed to a serverless host, whose
+    // filesystem is read-only, without configuring the Redis backend.
+    const hint =
+      store.name === "json-file" && process.env.VERCEL
+        ? "This deployment is using file storage, which cannot write on a serverless host. Connect the Upstash Redis integration (see the README)."
+        : "Could not save your request. Please try again.";
+    return NextResponse.json({ error: hint }, { status: 500 });
+  }
 }

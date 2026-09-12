@@ -60,6 +60,17 @@ npm run dev
 
 Open http://localhost:3000.
 
+**Without an API key** the app still runs: it falls back to a built-in mock
+classifier (see "AI provider" below). A yellow banner tells you when the mock
+is active.
+
+**With a key:** get a free Gemini key at https://aistudio.google.com/apikey
+and set `GEMINI_API_KEY=...` in `.env.local`. Restart `npm run dev` after
+changing env vars.
+
+Other commands: `npm run lint`, `npx tsc --noEmit`, `npm run build && npm start`.
+
+
 ### Mobile app (optional)
 
 The backend above must be running first, because the phone calls it.
@@ -77,15 +88,43 @@ No IP address needs configuring. The app reads the address it was served from
 (`Constants.expoConfig.hostUri`) and swaps in port 3000 to find the backend. To
 point it somewhere else, set `EXPO_PUBLIC_API_URL` in `mobile/.env`.
 
-**Without an API key** the app still runs: it falls back to a built-in mock
-classifier (see "AI provider" below). A yellow banner tells you when the mock
-is active.
+---
 
-**With a key:** get a free Gemini key at https://aistudio.google.com/apikey
-and set `GEMINI_API_KEY=...` in `.env.local`. Restart `npm run dev` after
-changing env vars.
+## Deploying it (so it can be tried without installing anything)
 
-Other commands: `npm run lint`, `npx tsc --noEmit`, `npm run build && npm start`.
+The app runs on Vercel's free tier. Two things need setting up.
+
+**1. The project**
+
+1. Sign in at [vercel.com](https://vercel.com) with GitHub.
+2. **Add New → Project**, import this repository. Next.js is detected automatically.
+3. Under **Environment Variables**, add `GEMINI_API_KEY` with your key.
+4. **Deploy**.
+
+**2. Storage**
+
+A serverless host gives every request a **read-only filesystem**, so the JSON
+file backend cannot write there. The app detects this and uses Redis instead:
+
+1. In the project, go to **Storage → Create Database → Upstash (Redis)**, or
+   install the Upstash integration from the Vercel Marketplace.
+2. Connect it to this project. It injects `KV_REST_API_URL` and
+   `KV_REST_API_TOKEN` automatically.
+3. **Redeploy** so the new variables are picked up.
+
+Nothing in the code changes between local and deployed. `src/lib/storage/`
+chooses its backend from the environment: Redis when those variables exist,
+the JSON file otherwise. If you deploy without step 2, saving returns a clear
+error telling you exactly this rather than a generic failure.
+
+**Pointing the mobile app at the deployed backend:** create `mobile/.env` with
+`EXPO_PUBLIC_API_URL=https://your-deployment.vercel.app`. The phone then needs
+no computer on the same network.
+
+> **Note on the API key.** A public deployment means anyone who finds the URL
+> can spend your Gemini quota. The free tier allows 1,500 requests a day, which
+> is ample for a demo, but a real deployment would need rate limiting — see the
+> improvements list at the end.
 
 ---
 
@@ -104,9 +143,10 @@ Mobile: src/app/index.tsx
   │ ◄─ {provider, suggestions[]}
   │  user edits category / priority / text, removes over-splits
   │ POST /api/requests {items} ─► api/requests/route.ts
-  │                               └► lib/storage.ts ──► data/requests.json
+  │                               └► lib/storage/ ──► JSON file (local)
+  │                                                 └► Redis   (deployed)
   ▼
-/requests page (server component) ─► lib/storage.ts listRequests()
+/requests page (server component) ─► lib/storage/ listRequests()
 ```
 
 Key files:
@@ -118,7 +158,10 @@ Key files:
 | `src/lib/ai/provider.ts` | The `AiProvider` interface, the env-based choice between Gemini and mock, and output validation. |
 | `src/lib/ai/gemini.ts` | The real provider. Calls Gemini with structured JSON output. |
 | `src/lib/ai/mock.ts` | Keyword-based fallback so the app runs with no key. |
-| `src/lib/storage.ts` | Reads and writes `data/requests.json`. |
+| `src/lib/storage/store.ts` | The storage interface both backends implement. |
+| `src/lib/storage/index.ts` | Picks the backend from environment variables. |
+| `src/lib/storage/file.ts` | JSON file backend, used locally. |
+| `src/lib/storage/redis.ts` | Redis backend, used when deployed. |
 | `src/app/api/analyze/route.ts` | `POST` endpoint the browser calls for classification. |
 | `src/app/api/requests/route.ts` | `GET` and `POST` endpoints for saved requests. |
 | `src/components/NewRequestForm.tsx` | The two-step submit flow (describe, then review and confirm). |
@@ -165,13 +208,21 @@ Not required by the brief, but showing *why* the AI chose urgent builds trust
 and makes it obvious to the user when to override. It also made prompt
 tuning much faster during development.
 
-**JSON file for storage.**
-The brief allows memory, JSON or SQLite. Memory loses data on every code
-change in dev; SQLite needs a native module and a schema. A JSON file is
-readable, survives restarts, and is trivially inspectable during a review.
-Writes are queued so concurrent saves can't corrupt the file. All storage
-access goes through two functions in `storage.ts`, so a real database is a
-drop-in replacement.
+**Two storage backends behind one interface.**
+The brief allows memory, JSON or SQLite. Locally the app writes
+`data/requests.json`: memory loses data on every code change in dev, SQLite
+needs a native module and a schema, and a JSON file is readable and trivially
+inspectable during a review. Writes are queued so concurrent saves can't
+corrupt it.
+
+That backend cannot work deployed, because serverless hosts give you a
+read-only filesystem. Rather than compromise the local experience, storage got
+the same treatment as the AI layer: an interface (`storage/store.ts`), two
+implementations (`file.ts`, `redis.ts`), and one place that picks between them
+from environment variables. Nothing that calls `listRequests()` or
+`addRequests()` changed. That is the payoff for having put storage behind a
+seam in the first place, and it is why the file backend was a reasonable
+starting point rather than a shortcut I had to undo.
 
 **Server Component for the Requests page, Client Component for the form.**
 The list page has no interactivity, so it reads the JSON file directly on
@@ -259,10 +310,11 @@ part of it.
 ## What's missing / what I'd improve with more time
 
 - **No automated tests.** I'd add unit tests for `normalizeSuggestions`,
-  `mock.ts` and `storage.ts` (Vitest), and one API-level test per route.
+  `mock.ts` and both storage backends (Vitest), and one API-level test per route.
 - **No auth or per-user data.** All requests are in one shared list.
-- **JSON file is single-instance.** Fine locally; a deployment with more than
-  one server would need SQLite/Postgres. The storage interface is ready for it.
+- **Redis stores requests as one flat list.** Fine for a demo; a real product
+  needs per-user scoping, pagination and a relational store. The storage
+  interface makes that a change in one folder.
 - **Rate limiting** on `/api/analyze`, since it spends API quota.
 - **Request detail / status.** Real apps would have statuses (new, assigned,
   done) and let the user delete or edit a saved request.

@@ -37,8 +37,9 @@ User types text, clicks Submit. The form POSTs to `/api/analyze`. The route
 picks a provider (Gemini if key, else mock), the provider returns a list of
 suggestions, the route sends them back. The form shows one editable card per
 suggestion. User clicks Confirm. The form POSTs the cards to `/api/requests`.
-The route validates each item and appends them to `data/requests.json`. The
-form navigates to `/requests`, which reads the file and renders the list.
+The route validates each item and hands them to the storage layer, which
+appends them to `data/requests.json` locally or to Redis when deployed. The
+form navigates to `/requests`, which reads them back and renders the list.
 
 ## Likely live-review changes and where to make them
 
@@ -46,10 +47,11 @@ form navigates to `/requests`, which reads the file and renders the list.
 |---|---|
 | Add a category, e.g. "painting" | `types.ts`: add to `CATEGORIES` and `CATEGORY_LABELS`. Prompt picks it up automatically via `JSON.stringify(CATEGORIES)`. Add a line describing it in `prompt.ts`. Optionally add keywords in `mock.ts`. |
 | Add a third priority, e.g. "low" | `types.ts`: add to `PRIORITIES` and `PRIORITY_LABELS`. `prompt.ts`: describe when to use it. The badge and the toggle buttons read labels from the map, so they update automatically. The red-vs-blue styling checks `=== "urgent"`, so a third value gets the neutral style by default. |
-| Delete a request | Add `DELETE` to `api/requests/route.ts` (or `api/requests/[id]/route.ts`), add `removeRequest(id)` in `storage.ts`, add a button in `requests/page.tsx` (it would need to become a client component, or use a small client `DeleteButton`). |
+| Delete a request | Add `DELETE` to `api/requests/route.ts` (or `api/requests/[id]/route.ts`), add `remove(id)` to the `RequestStore` interface in `storage/store.ts` and to both backends, add a button in `requests/page.tsx` (it would need to become a client component, or use a small client `DeleteButton`). |
 | Filter the list by priority | In `requests/page.tsx`, read `searchParams` and filter before rendering, or add a client-side filter component. |
 | Switch to OpenAI | New `lib/ai/openai.ts` implementing `AiProvider`; add one line in `getProvider()`. |
-| Use SQLite instead of JSON | Rewrite `listRequests` and `addRequests` in `storage.ts`. Nothing else changes. |
+| Use SQLite/Postgres instead | Add `storage/sqlite.ts` implementing `RequestStore`, add one line to `getStore()` in `storage/index.ts`. Nothing else changes. |
+| Why two storage backends? | Serverless hosts have a read-only filesystem, so the JSON file works locally but not deployed. Same interface, picked by env vars. |
 | Make the AI stricter about splitting | Edit the rule in `prompt.ts`. |
 | Show which provider answered | Already returned by `/api/analyze` as `provider`. |
 
@@ -88,12 +90,15 @@ Four things to know:
   one problem or two, and halves latency and quota use.
 - "Why validate after the schema?" Defence in depth. Schemas reduce bad
   output, they don't eliminate it, and the UI must never crash.
-- "Why a JSON file?" Survives restarts, no native deps, readable during a
-  review. Behind two functions so it's swappable.
+- "Why a JSON file locally but Redis deployed?" Serverless hosts have a
+  read-only filesystem, so the file backend physically cannot write there. Both
+  implement the same `RequestStore` interface and `getStore()` picks one from
+  env vars, so no calling code changed when I added the second.
 - "Why is the list page a server component?" No interactivity, so no reason
   to ship JavaScript for it. It reads storage directly.
-- "What would break in production?" Single JSON file on one machine. Would
-  move to a database first, then add auth and rate limiting.
+- "What would break in production?" The Redis list is global and unpaginated,
+  and `/api/analyze` has no rate limit, so a public URL spends my Gemini quota.
+  Auth, per-user scoping and rate limiting would come first.
 - "Does the mobile app depend on the web app?" No. Both are clients of the same
   backend. The mobile app never calls the web UI. If the API moved to its own
   service, the mobile app would change by one line.
