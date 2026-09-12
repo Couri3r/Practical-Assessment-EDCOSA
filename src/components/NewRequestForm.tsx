@@ -10,6 +10,7 @@ import {
   CATEGORIES,
   CATEGORY_LABELS,
   PRIORITIES,
+  PRIORITY_LABELS,
   type Category,
   type Priority,
   type Suggestion,
@@ -221,7 +222,7 @@ export default function NewRequestForm() {
                           : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
                       }`}
                     >
-                      {p === "urgent" ? "Urgent" : "Normal"}
+                      {PRIORITY_LABELS[p]}
                     </button>
                   ))}
                 </div>

@@ -28,6 +28,11 @@ export const CATEGORY_LABELS: Record<Category, string> = {
   other: "Other",
 };
 
+export const PRIORITY_LABELS: Record<Priority, string> = {
+  normal: "Normal",
+  urgent: "Urgent",
+};
+
 // What the AI returns for ONE problem. If the user described several
 // problems in one message, the AI returns several of these.
 export interface Suggestion {

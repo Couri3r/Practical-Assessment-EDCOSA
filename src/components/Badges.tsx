@@ -1,7 +1,7 @@
 // Small presentational components shared by the form and the list.
 // No "use client" needed: they have no state or event handlers.
 
-import { CATEGORY_LABELS, type Category, type Priority } from "@/lib/types";
+import { CATEGORY_LABELS, PRIORITY_LABELS, type Category, type Priority } from "@/lib/types";
 
 export function PriorityBadge({ priority }: { priority: Priority }) {
   const styles =
@@ -10,7 +10,7 @@ export function PriorityBadge({ priority }: { priority: Priority }) {
       : "bg-gray-100 text-gray-700 ring-gray-200";
   return (
     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${styles}`}>
-      {priority === "urgent" ? "Urgent" : "Normal"}
+      {PRIORITY_LABELS[priority]}
     </span>
   );
 }

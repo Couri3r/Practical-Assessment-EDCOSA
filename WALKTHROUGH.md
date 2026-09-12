@@ -45,7 +45,7 @@ form navigates to `/requests`, which reads the file and renders the list.
 | They ask for | Change |
 |---|---|
 | Add a category, e.g. "painting" | `types.ts`: add to `CATEGORIES` and `CATEGORY_LABELS`. Prompt picks it up automatically via `JSON.stringify(CATEGORIES)`. Add a line describing it in `prompt.ts`. Optionally add keywords in `mock.ts`. |
-| Add a third priority, e.g. "low" | `types.ts`: add to `PRIORITIES`. `prompt.ts`: describe when to use it. `Badges.tsx` and the priority buttons in `NewRequestForm.tsx` use hard-coded "Urgent"/"Normal" labels, so add a label map like `CATEGORY_LABELS`. |
+| Add a third priority, e.g. "low" | `types.ts`: add to `PRIORITIES` and `PRIORITY_LABELS`. `prompt.ts`: describe when to use it. The badge and the toggle buttons read labels from the map, so they update automatically. The red-vs-blue styling checks `=== "urgent"`, so a third value gets the neutral style by default. |
 | Delete a request | Add `DELETE` to `api/requests/route.ts` (or `api/requests/[id]/route.ts`), add `removeRequest(id)` in `storage.ts`, add a button in `requests/page.tsx` (it would need to become a client component, or use a small client `DeleteButton`). |
 | Filter the list by priority | In `requests/page.tsx`, read `searchParams` and filter before rendering, or add a client-side filter component. |
 | Switch to OpenAI | New `lib/ai/openai.ts` implementing `AiProvider`; add one line in `getProvider()`. |
