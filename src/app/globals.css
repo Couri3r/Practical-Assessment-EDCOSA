@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+/* Light theme only, kept deliberately small. Tailwind utility classes do the rest. */
+:root {
+  --background: #f6f7f9;
+  --foreground: #111827;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
