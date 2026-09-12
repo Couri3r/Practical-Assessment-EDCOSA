@@ -6,9 +6,15 @@ describes a problem in plain language (English or Arabic), the AI suggests a
 saved to a **Requests** list. If one message describes several problems, the AI
 splits it into several requests automatically.
 
-Built as a mobile-first web app with Next.js. Screens:
+There are **two clients and one backend**:
 
-| `/` – describe the problem | `/` – review and edit | `/requests` – list |
+- a mobile-first **web app** (Next.js) — the baseline requirement
+- a **native mobile app** (React Native via Expo) — the optional bonus
+- one **backend** (Next.js route handlers) that both call, and that holds the API key
+
+Screens, in both clients:
+
+| describe the problem | review and edit | list |
 |---|---|---|
 | text box, Submit button | one card per detected problem, editable category and priority | all saved requests with category, priority and date |
 
@@ -17,6 +23,8 @@ Built as a mobile-first web app with Next.js. Screens:
 ## Run it locally
 
 Requirements: Node.js 20 or newer.
+
+### Web app (and the backend)
 
 ```bash
 git clone <this repo>
@@ -27,6 +35,23 @@ npm run dev
 ```
 
 Open http://localhost:3000.
+
+### Mobile app (optional)
+
+The backend above must be running first, because the phone calls it.
+
+```bash
+cd mobile
+npm install
+npx expo start
+```
+
+Then install **Expo Go** on an Android phone from the Play Store, put the phone on
+the same Wi-Fi as the computer, and scan the QR code that `expo start` prints.
+
+No IP address needs configuring. The app reads the address it was served from
+(`Constants.expoConfig.hostUri`) and swaps in port 3000 to find the backend. To
+point it somewhere else, set `EXPO_PUBLIC_API_URL` in `mobile/.env`.
 
 **Without an API key** the app still runs: it falls back to a built-in mock
 classifier (see "AI provider" below). A yellow banner tells you when the mock
@@ -43,9 +68,11 @@ Other commands: `npm run lint`, `npx tsc --noEmit`, `npm run build && npm start`
 ## How it works
 
 ```
-Browser (React)                 Server (Next.js route handlers)         External
+Clients                         Server (Next.js route handlers)         External
 ─────────────────────────       ─────────────────────────────────       ────────
-NewRequestForm
+Web: NewRequestForm
+Mobile: src/app/index.tsx
+  │  (both call the same two endpoints)
   │ POST /api/analyze {text} ─► api/analyze/route.ts
   │                               └► lib/ai/provider.ts  getProvider()
   │                                    ├► lib/ai/gemini.ts ───────────► Gemini API
@@ -71,7 +98,11 @@ Key files:
 | `src/app/api/analyze/route.ts` | `POST` endpoint the browser calls for classification. |
 | `src/app/api/requests/route.ts` | `GET` and `POST` endpoints for saved requests. |
 | `src/components/NewRequestForm.tsx` | The two-step submit flow (describe, then review and confirm). |
-| `src/app/requests/page.tsx` | The Requests list. |
+| `src/app/requests/page.tsx` | The Requests list (web). |
+| `mobile/src/lib/api.ts` | The only place the mobile app touches the network. Works out the backend address automatically. |
+| `mobile/src/app/_layout.tsx` | Bottom tab bar. Expo Router uses file-based routing, same idea as the Next.js app directory. |
+| `mobile/src/app/index.tsx` | The mobile submit flow. |
+| `mobile/src/app/requests.tsx` | The mobile Requests list, with pull-to-refresh. |
 
 ---
 
@@ -127,6 +158,33 @@ Next.js split and keeps the client bundle small.
 **A `GET /api/requests` endpoint exists even though the web UI doesn't use it.**
 It costs five lines and means a future React Native or Flutter app can use
 the same backend unchanged.
+
+**React Native (via Expo) for the bonus mobile app, not Flutter.**
+Both were allowed. React Native reuses what the web app already establishes:
+the same language, the same React model, the same TypeScript shapes and the
+same backend. Flutter would have meant a second language and a second mental
+model for no gain here. Expo is the standard React Native toolchain and means
+the app runs on a real device through Expo Go without installing Android
+Studio or building an APK. The result is a genuine native app, not a web view.
+
+**The mobile app is a client of the same backend, not of the web app.**
+Adding mobile required *zero* backend changes, because `GET /api/requests`
+already existed. That is the whole argument for having built the backend as
+plain HTTP endpoints rather than putting the logic in server components only.
+
+**Category chips on mobile instead of a dropdown.**
+The web uses a `<select>`, which is the right native control in a browser. On a
+phone a `<select>` opens a modal wheel for what is only seven options, so the
+mobile screen shows them as tappable chips instead. Same data, different
+idiom — the point of building a real native app rather than wrapping the web one.
+
+**The mobile app mirrors `types.ts` instead of importing it.**
+The two projects are separate npm packages with separate bundlers (Turbopack and
+Metro), so there is no import path between them without converting the repo into
+a workspace monorepo. For a two-screen demo I judged a mirrored file with a
+pointer comment to be lower risk than restructuring the whole repo. It is the
+one piece of duplication in the project and it is the first thing I would fix
+with more time (see below).
 
 **Mobile-first Tailwind.**
 Every layout is written for a phone first (single column, full-width
@@ -186,8 +244,12 @@ part of it.
   done) and let the user delete or edit a saved request.
 - **Full Arabic UI with an RTL toggle.** Input and display already handle
   Arabic; the labels and buttons are English only.
-- **Native mobile app (bonus).** Not attempted. The backend is ready for it:
-  a React Native app would call the same two API routes.
+- **Shared types between web and mobile.** `mobile/src/lib/types.ts` mirrors
+  `src/lib/types.ts` by hand. I would convert the repo to an npm workspace with a
+  `shared` package that both import, so the category list can only be defined once.
+- **Mobile app depth.** The mobile app covers the same flow as the web app but
+  has no offline cache and no deep links. It also needs the backend running on a
+  reachable machine; deploying the backend would make it work anywhere.
 - **Prompt evaluation set.** A small file of tricky inputs (one long problem
   vs two short ones, Arabic dialect, non-maintenance text) with expected
   outputs, run as a regression test whenever the prompt changes.

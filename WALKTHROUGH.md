@@ -53,6 +53,35 @@ form navigates to `/requests`, which reads the file and renders the list.
 | Make the AI stricter about splitting | Edit the rule in `prompt.ts`. |
 | Show which provider answered | Already returned by `/api/analyze` as `provider`. |
 
+## The mobile app, in the same spirit
+
+Expo Router works like the Next.js app directory: `mobile/src/app/index.tsx` is
+the first screen, `requests.tsx` is the second, `_layout.tsx` wraps both and
+draws the tab bar. If you can explain the web routing you can explain this.
+
+Four things to know:
+
+1. **Expo is React Native.** React Native renders real native Android views from
+   React code. Expo is the toolchain around it: Expo Go on the phone loads your
+   app over Wi-Fi so you never install Android Studio. The alternative, bare
+   React Native, needs the full Android SDK and a Gradle build.
+2. **It talks to the same backend.** `mobile/src/lib/api.ts` is the only file
+   that does networking. Adding mobile needed no backend change at all, because
+   `GET /api/requests` already existed.
+3. **It finds the server by itself.** The phone downloaded the app from Metro on
+   your PC, so Expo already knows your PC's address. `api.ts` reuses that host
+   and swaps port 8081 for 3000. Nothing is hard-coded.
+4. **No HTML here.** `View` replaces `div`, `Text` replaces `p`, `Pressable`
+   replaces `button`, and styles are objects in `StyleSheet.create` rather than
+   CSS classes. Every string of text must sit inside a `Text`.
+
+| They ask for (mobile) | Change |
+|---|---|
+| Change a colour | `mobile/src/lib/theme.ts`. Everything reads from there. |
+| Add a screen | Add a file under `mobile/src/app/`, add a `Tabs.Screen` in `_layout.tsx`. |
+| Point at a deployed backend | Set `EXPO_PUBLIC_API_URL` in `mobile/.env`. |
+| Add a category | Same as web, but edit the mirrored `mobile/src/lib/types.ts` too. |
+
 ## Things worth being able to say out loud
 
 - "Why one call instead of two?" One call has full context to decide if it's
@@ -65,3 +94,9 @@ form navigates to `/requests`, which reads the file and renders the list.
   to ship JavaScript for it. It reads storage directly.
 - "What would break in production?" Single JSON file on one machine. Would
   move to a database first, then add auth and rate limiting.
+- "Does the mobile app depend on the web app?" No. Both are clients of the same
+  backend. The mobile app never calls the web UI. If the API moved to its own
+  service, the mobile app would change by one line.
+- "Why is `types.ts` duplicated?" Two bundlers, two npm packages, no import path
+  without a monorepo. A deliberate tradeoff, flagged in the README, and the
+  first thing I'd fix.
