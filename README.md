@@ -18,6 +18,17 @@ Screens, in both clients:
 |---|---|---|
 | text box, Submit button | one card per detected problem, editable category and priority | all saved requests with category, priority and date |
 
+## Demo
+
+One Arabic sentence describing three unrelated problems, split into three
+requests with their own category and priority, edited, then saved.
+
+<p align="center">
+  <img src="docs/demo-mobile.gif" width="320" alt="FixIt on Android: one Arabic message split into three separate requests" />
+</p>
+
+<p align="center"><em>The mobile app (React Native / Expo) on a Samsung S25.</em></p>
+
 ---
 
 ## Run it locally
