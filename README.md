@@ -1,5 +1,7 @@
 # FixIt – AI-assisted maintenance requests
 
+**Try it live: https://practical-assessment-edcosa.vercel.app** — no install needed.
+
 A small feature for an app that connects customers with craftsmen. The customer
 describes a problem in plain language (English or Arabic), the AI suggests a
 **category** and a **priority**, the customer can edit both, and the request is
