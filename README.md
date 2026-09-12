@@ -20,14 +20,27 @@ Screens, in both clients:
 
 ## Demo
 
-One Arabic sentence describing three unrelated problems, split into three
-requests with their own category and priority, edited, then saved.
+The same input in both clients: one Arabic sentence describing three unrelated
+problems, split into three requests with their own category and priority,
+edited, then saved.
+
+> "عندي تسريب مويه يغرق المطبخ، والمكيف بغرفة النوم ما يبرد، وباب الحمام ما يسكر"
+>
+> *"There's a water leak flooding the kitchen, the bedroom AC isn't cooling, and the bathroom door won't close."*
+>
+> → plumbing / **urgent** · AC / normal · carpentry / normal
+
+**Web app** — the baseline requirement:
 
 <p align="center">
-  <img src="docs/demo-mobile.gif" width="320" alt="FixIt on Android: one Arabic message split into three separate requests" />
+  <img src="docs/demo-web.gif" width="640" alt="FixIt web app: one Arabic message split into three separate requests" />
 </p>
 
-<p align="center"><em>The mobile app (React Native / Expo) on a Samsung S25.</em></p>
+**Mobile app** — the optional bonus, running on a Samsung S25:
+
+<p align="center">
+  <img src="docs/demo-mobile.gif" width="300" alt="FixIt on Android: one Arabic message split into three separate requests" />
+</p>
 
 ---
 
